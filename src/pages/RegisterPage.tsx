@@ -1,0 +1,99 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+export function RegisterPage() {
+  const navigate = useNavigate();
+  const [accountType, setAccountType] = useState<'candidate' | 'employer'>(
+    'candidate'
+  );
+  return (
+    <div className="bg-white min-h-screen flex items-center justify-center p-6 py-12">
+      <div className="w-full max-w-md mx-auto">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Create an account
+          </h1>
+          <p className="text-gray-600">Join Sri Lanka's smart job portal</p>
+        </div>
+
+        <div className="bg-[#F3F4F6] border border-gray-200 rounded-[24px] p-8">
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <button
+              onClick={() => setAccountType('candidate')}
+              className={`p-4 rounded-xl border text-left transition-colors ${accountType === 'candidate' ? 'bg-purple-50 border-purple-600 ring-1 ring-purple-600' : 'bg-white border-gray-200 hover:border-purple-300'}`}>
+              
+              <div className="font-semibold text-gray-900 mb-1">Candidate</div>
+              <div className="text-xs text-gray-500">
+                I want to find jobs and improve my CV.
+              </div>
+            </button>
+            <button
+              onClick={() => setAccountType('employer')}
+              className={`p-4 rounded-xl border text-left transition-colors ${accountType === 'employer' ? 'bg-purple-50 border-purple-600 ring-1 ring-purple-600' : 'bg-white border-gray-200 hover:border-purple-300'}`}>
+              
+              <div className="font-semibold text-gray-900 mb-1">Employer</div>
+              <div className="text-xs text-gray-500">
+                I want to post jobs and find candidates.
+              </div>
+            </button>
+          </div>
+
+          <form
+            className="space-y-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              navigate(
+                accountType === 'candidate' ?
+                '/candidate/dashboard' :
+                '/employer/dashboard'
+              );
+            }}>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Full name
+              </label>
+              <input
+                type="text"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
+                placeholder="John Doe" />
+              
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email address
+              </label>
+              <input
+                type="email"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
+                placeholder="Enter your email" />
+              
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Password
+              </label>
+              <input
+                type="password"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
+                placeholder="Create a password" />
+              
+            </div>
+            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-xl transition-colors mt-2">
+              Create Account
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center mt-8 text-gray-600">
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            className="text-purple-600 font-medium hover:underline">
+            
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </div>);
+
+}
