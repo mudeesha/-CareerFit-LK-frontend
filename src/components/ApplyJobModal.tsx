@@ -1,45 +1,62 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
-import { Job } from '../lib/types';
-import { CompanyLogo } from './CompanyLogo';
+import React, { useState } from "react";
+import { X } from "lucide-react";
+import { Job } from "../lib/types";
+import { CompanyLogo } from "./CompanyLogo";
+
 interface ApplyJobModalProps {
   job: Job;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: (coverLetter: string) => Promise<void> | void;
   matchScore: number;
+  isSubmitting?: boolean;
 }
+
 export function ApplyJobModal({
   job,
   isOpen,
   onClose,
   onSubmit,
-  matchScore
+  matchScore,
+  isSubmitting = false,
 }: ApplyJobModalProps) {
-  const [coverLetter, setCoverLetter] = useState('');
-  const [error, setError] = useState('');
+  const [coverLetter, setCoverLetter] = useState("");
+  const [error, setError] = useState("");
+
   if (!isOpen) return null;
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!coverLetter.trim()) {
-      setError('Cover letter is required.');
+      setError("Cover letter is required.");
       return;
     }
-    onSubmit();
+
+    if (coverLetter.trim().length < 10) {
+      setError("Cover letter must be at least 10 characters.");
+      return;
+    }
+
+    await onSubmit(coverLetter.trim());
   };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose} />
-      
+        onClick={isSubmitting ? undefined : onClose}
+      />
+
       <div className="relative w-full max-w-lg bg-white rounded-[20px] shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">Apply for Job</h2>
+
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600">
-            
+            disabled={isSubmitting}
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -47,6 +64,7 @@ export function ApplyJobModal({
         <div className="p-6 overflow-y-auto">
           <div className="bg-[#F3F4F6] rounded-xl p-4 flex items-center gap-4 mb-6 border border-gray-200">
             <CompanyLogo company={job.company} size="md" />
+
             <div>
               <h3 className="font-semibold text-gray-900">{job.title}</h3>
               <p className="text-sm text-gray-500">{job.company?.name}</p>
@@ -60,6 +78,7 @@ export function ApplyJobModal({
               </div>
               <div className="text-purple-700">Nimal Perera</div>
             </div>
+
             <div className="text-right">
               <div className="text-sm text-purple-900 font-medium">
                 Match Score
@@ -73,14 +92,16 @@ export function ApplyJobModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Selected CV
               </label>
+
               <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
                 <svg
                   className="w-6 h-6 text-red-500"
                   fill="currentColor"
-                  viewBox="0 0 24 24">
-                  
+                  viewBox="0 0 24 24"
+                >
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z" />
                 </svg>
+
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">
                     nimal-perera-cv.pdf
@@ -89,10 +110,12 @@ export function ApplyJobModal({
                     Updated 2 days ago
                   </div>
                 </div>
+
                 <button
                   type="button"
-                  className="text-sm text-purple-600 font-medium">
-                  
+                  className="text-sm text-purple-600 font-medium"
+                  disabled={isSubmitting}
+                >
                   Change
                 </button>
               </div>
@@ -102,16 +125,23 @@ export function ApplyJobModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Cover Letter
               </label>
+
               <textarea
-                className={`w-full border ${error ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-purple-600'} rounded-lg p-3 text-sm focus:outline-none focus:ring-2`}
+                className={`w-full border ${
+                  error
+                    ? "border-red-300 focus:ring-red-500"
+                    : "border-gray-200 focus:ring-purple-600"
+                } rounded-lg p-3 text-sm focus:outline-none focus:ring-2`}
                 rows={5}
                 placeholder="Write a short message to the employer..."
                 value={coverLetter}
+                disabled={isSubmitting}
                 onChange={(e) => {
                   setCoverLetter(e.target.value);
-                  if (error) setError('');
-                }} />
-              
+                  if (error) setError("");
+                }}
+              />
+
               {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
             </div>
           </form>
@@ -121,19 +151,22 @@ export function ApplyJobModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-xl transition-colors">
-            
+            disabled={isSubmitting}
+            className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50"
+          >
             Cancel
           </button>
+
           <button
             type="submit"
             form="apply-form"
-            className="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors">
-            
-            Submit Application
+            disabled={isSubmitting}
+            className="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors disabled:opacity-60"
+          >
+            {isSubmitting ? "Submitting..." : "Submit Application"}
           </button>
         </div>
       </div>
-    </div>);
-
+    </div>
+  );
 }

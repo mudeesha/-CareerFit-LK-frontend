@@ -1,9 +1,24 @@
+export type WorkMode = "ONSITE" | "HYBRID" | "REMOTE";
+
+export type JobType =
+  | "FULL_TIME"
+  | "PART_TIME"
+  | "CONTRACT"
+  | "INTERNSHIP";
+
+export type ExperienceLevel =
+  | "ENTRY_LEVEL"
+  | "ONE_TO_TWO_YEARS"
+  | "THREE_TO_FIVE_YEARS"
+  | "FIVE_PLUS_YEARS";
+
 export type JobStatus =
-'PENDING_APPROVAL' |
-'ACTIVE' |
-'CLOSED' |
-'REJECTED' |
-'DRAFT';
+  | "DRAFT"
+  | "PENDING_APPROVAL"
+  | "ACTIVE"
+  | "CLOSED"
+  | "REJECTED";
+
 export type ApplicationStatus =
 'APPLIED' |
 'VIEWED' |
@@ -32,24 +47,25 @@ export interface Job {
   id: string;
   title: string;
   companyId: string;
+  categoryId?: string;
   company?: Company;
+  category?: Category;
   location: string;
-  workMode: 'On-site' | 'Hybrid' | 'Remote';
-  jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Internship';
+  workMode: WorkMode;
+  jobType: JobType;
   salaryMin: number;
   salaryMax: number;
+  experienceLevel: ExperienceLevel;
   skills: string[];
   preferredSkills?: string[];
-  category: string;
-  experienceLevel: string;
-  postedDate: string;
-  closingDate?: string;
-  matchScore?: number;
-  status: JobStatus;
-  applicantCount: number;
   description?: string;
   responsibilities?: string[];
   benefits?: string[];
+  status: JobStatus;
+  isFeatured?: boolean;
+  applicantCount: number;
+  postedDate?: string;
+  matchScore?: number;
 }
 
 export interface Category {
