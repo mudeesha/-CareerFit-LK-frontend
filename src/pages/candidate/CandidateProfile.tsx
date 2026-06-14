@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Camera, X } from "lucide-react";
 import { toast } from "sonner";
+import { API_FILE_BASE_URL } from "../../services/apiClient";
 import {
   getMyProfile,
   updateMyProfile,
+  uploadProfileAvatar,
   type CandidateProfileResponse,
   type UpdateProfilePayload,
 } from "../../services/profileApi";
@@ -38,6 +40,51 @@ export function CandidateProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  const profileImageInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleProfileImageClick = () => {
+    profileImageInputRef.current?.click();
+  };
+
+  const handleProfileImageChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const updatedProfile = await uploadProfileAvatar(file);
+      fillForm(updatedProfile);
+      toast.success("Profile image uploaded successfully");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload image"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  function getProfileImageSrc(profileImageUrl: string) {
+    if (
+      profileImageUrl.startsWith("http://") ||
+      profileImageUrl.startsWith("https://") ||
+      profileImageUrl.startsWith("data:")
+    ) {
+      return profileImageUrl;
+    }
+
+    return `${API_FILE_BASE_URL}${profileImageUrl}`;
+  }
+
   function fillForm(data: CandidateProfileResponse) {
     setProfile(data);
 
@@ -62,9 +109,7 @@ export function CandidateProfile() {
     async function loadProfile() {
       try {
         setIsLoading(true);
-
         const data = await getMyProfile();
-
         fillForm(data);
       } catch (error) {
         toast.error(
@@ -81,12 +126,9 @@ export function CandidateProfile() {
   const handleAddSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && newSkill.trim()) {
       e.preventDefault();
-
       const skill = newSkill.trim();
 
-      if (!skills.includes(skill)) {
-        setSkills([...skills, skill]);
-      }
+      if (!skills.includes(skill)) setSkills([...skills, skill]);
 
       setNewSkill("");
     }
@@ -95,12 +137,9 @@ export function CandidateProfile() {
   const handleAddLanguage = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && newLanguage.trim()) {
       e.preventDefault();
-
       const language = newLanguage.trim();
 
-      if (!languages.includes(language)) {
-        setLanguages([...languages, language]);
-      }
+      if (!languages.includes(language)) setLanguages([...languages, language]);
 
       setNewLanguage("");
     }
@@ -111,7 +150,6 @@ export function CandidateProfile() {
   ) => {
     if (e.key === "Enter" && newPreferredLocation.trim()) {
       e.preventDefault();
-
       const location = newPreferredLocation.trim();
 
       if (!preferredLocations.includes(location)) {
@@ -137,9 +175,7 @@ export function CandidateProfile() {
   };
 
   const handleDiscard = () => {
-    if (profile) {
-      fillForm(profile);
-    }
+    if (profile) fillForm(profile);
   };
 
   const handleSave = async () => {
@@ -165,7 +201,7 @@ export function CandidateProfile() {
         linkedinUrl: linkedinUrl.trim(),
         githubUrl: githubUrl.trim(),
         portfolioUrl: portfolioUrl.trim(),
-        profileImageUrl: profileImageUrl.trim(),
+        profileImageUrl,
       };
 
       const updatedProfile = await updateMyProfile(payload);
@@ -204,6 +240,14 @@ export function CandidateProfile() {
 
   return (
     <div className="max-w-4xl mx-auto pb-10">
+      <input
+        ref={profileImageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleProfileImageChange}
+      />
+
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">My Profile</h1>
         <p className="text-gray-600">
@@ -216,7 +260,7 @@ export function CandidateProfile() {
           <div className="w-24 h-24 bg-white rounded-full overflow-hidden border-4 border-white shadow-sm">
             {profileImageUrl ? (
               <img
-                src={profileImageUrl}
+                src={getProfileImageSrc(profileImageUrl)}
                 alt="Profile"
                 className="w-full h-full object-cover"
               />
@@ -227,7 +271,11 @@ export function CandidateProfile() {
             )}
           </div>
 
-          <button className="absolute bottom-0 right-0 w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors border-2 border-white">
+          <button
+            type="button"
+            onClick={handleProfileImageClick}
+            className="absolute bottom-0 right-0 w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors border-2 border-white"
+          >
             <Camera className="w-4 h-4" />
           </button>
         </div>
@@ -235,7 +283,6 @@ export function CandidateProfile() {
         <div className="flex-1 text-center md:text-left">
           <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2">
             <h2 className="text-xl font-bold text-gray-900">{fullName}</h2>
-
             <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-2.5 py-1 rounded-full w-fit mx-auto md:mx-0">
               Top 15% Profile
             </span>
@@ -260,9 +307,7 @@ export function CandidateProfile() {
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-purple-600 rounded-full"
-                  style={{
-                    width: `${profile.profileCompletion}%`,
-                  }}
+                  style={{ width: `${profile.profileCompletion}%` }}
                 />
               </div>
             </div>
@@ -285,7 +330,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name
               </label>
-
               <input
                 type="text"
                 value={fullName}
@@ -298,7 +342,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email
               </label>
-
               <input
                 type="email"
                 value={profile.user?.email || ""}
@@ -311,7 +354,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Phone Number
               </label>
-
               <input
                 type="tel"
                 value={phone}
@@ -324,7 +366,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 District
               </label>
-
               <input
                 type="text"
                 value={district}
@@ -345,7 +386,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Current Role
               </label>
-
               <input
                 type="text"
                 value={currentRole}
@@ -358,7 +398,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Years of Experience
               </label>
-
               <input
                 type="number"
                 min="0"
@@ -373,7 +412,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Expected Salary (LKR)
               </label>
-
               <input
                 type="number"
                 value={expectedSalary}
@@ -386,7 +424,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Education
               </label>
-
               <input
                 type="text"
                 value={education}
@@ -408,7 +445,6 @@ export function CandidateProfile() {
                   className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2"
                 >
                   {skill}
-
                   <button
                     onClick={() => removeSkill(skill)}
                     className="text-gray-400 hover:text-red-500"
@@ -460,7 +496,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 LinkedIn URL
               </label>
-
               <input
                 type="url"
                 value={linkedinUrl}
@@ -473,7 +508,6 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 GitHub URL
               </label>
-
               <input
                 type="url"
                 value={githubUrl}
@@ -486,24 +520,10 @@ export function CandidateProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Portfolio URL
               </label>
-
               <input
                 type="url"
                 value={portfolioUrl}
                 onChange={(e) => setPortfolioUrl(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Profile Image URL
-              </label>
-
-              <input
-                type="url"
-                value={profileImageUrl}
-                onChange={(e) => setProfileImageUrl(e.target.value)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
               />
             </div>
@@ -521,7 +541,6 @@ export function CandidateProfile() {
                   className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2"
                 >
                   {location}
-
                   <button
                     onClick={() => removePreferredLocation(location)}
                     className="text-gray-400 hover:text-red-500"
@@ -554,7 +573,6 @@ export function CandidateProfile() {
                   className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2"
                 >
                   {language}
-
                   <button
                     onClick={() => removeLanguage(language)}
                     className="text-gray-400 hover:text-red-500"

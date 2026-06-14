@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Bookmark, Share2, CheckCircle2, ArrowLeft, Search } from "lucide-react";
+import {
+  Bookmark,
+  Share2,
+  CheckCircle2,
+  ArrowLeft,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 import { CompanyLogo } from "../components/CompanyLogo";
 import { CareerFitAdvisor } from "../components/CareerFitAdvisor";
@@ -11,6 +17,8 @@ import type { Job, MatchResult } from "../lib/types";
 import { getJobById, getJobs } from "../services/jobApi";
 import { getJobMatch } from "../services/matchApi";
 import { createApplication } from "../services/applicationApi";
+import { getStoredAuthUser } from "../services/authApi";
+import { MatchAnalysisModal } from "../components/MatchAnalysisModal";
 
 function workModeLabel(value: Job["workMode"]) {
   const labels: Record<Job["workMode"], string> = {
@@ -42,13 +50,14 @@ export function JobDetailPage() {
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isMatchLoading, setIsMatchLoading] = useState(true);
+  const [isMatchLoading, setIsMatchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [isApplied, setIsApplied] = useState(false);
   const [isSubmittingApplication, setIsSubmittingApplication] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,7 +71,7 @@ export function JobDetailPage() {
 
       try {
         setIsLoading(true);
-        setIsMatchLoading(true);
+        setIsMatchLoading(false);
         setError(null);
 
         const jobData = await getJobById(jobId);
@@ -71,19 +80,39 @@ export function JobDetailPage() {
 
         setJob(jobData);
 
-        const [matchData, similarJobsData] = await Promise.all([
-          getJobMatch(jobId),
-          getJobs({ category: jobData.category }),
-        ]);
+        const similarJobsData = await getJobs({
+          category: jobData.category?.name,
+        });
 
         if (!isMounted) return;
 
-        setMatchResult(matchData);
         setSimilarJobs(
           similarJobsData.items
             .filter((similarJob) => similarJob.id !== jobData.id)
             .slice(0, 2)
         );
+
+        const user = getStoredAuthUser();
+
+        if (user?.role === "CANDIDATE") {
+          try {
+            setIsMatchLoading(true);
+
+            const matchData = await getJobMatch(jobId);
+
+            if (!isMounted) return;
+
+            setMatchResult(matchData);
+          } catch {
+            setMatchResult(null);
+          } finally {
+            if (isMounted) {
+              setIsMatchLoading(false);
+            }
+          }
+        } else {
+          setMatchResult(null);
+        }
       } catch (err) {
         if (isMounted) {
           setError(
@@ -104,6 +133,23 @@ export function JobDetailPage() {
       isMounted = false;
     };
   }, [jobId]);
+
+  const handleOpenApplyModal = () => {
+    const user = getStoredAuthUser();
+
+    if (!user) {
+      toast.error("Please login as a candidate to apply");
+      navigate("/login");
+      return;
+    }
+
+    if (user.role !== "CANDIDATE") {
+      toast.error("Only candidates can apply for jobs");
+      return;
+    }
+
+    setIsApplyModalOpen(true);
+  };
 
   const handleApplySubmit = async (coverLetter: string) => {
     if (!job) return;
@@ -217,7 +263,9 @@ export function JobDetailPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-white rounded-xl p-4 border border-gray-200">
                   <div className="text-xs text-gray-500 mb-1">Location</div>
-                  <div className="font-medium text-gray-900">{job.location}</div>
+                  <div className="font-medium text-gray-900">
+                    {job.location}
+                  </div>
                 </div>
 
                 <div className="bg-white rounded-xl p-4 border border-gray-200">
@@ -237,7 +285,8 @@ export function JobDetailPage() {
                 <div className="bg-white rounded-xl p-4 border border-gray-200">
                   <div className="text-xs text-gray-500 mb-1">Salary</div>
                   <div className="font-medium text-gray-900">
-                    {formatCurrency(job.salaryMin)} - {formatCurrency(job.salaryMax)}
+                    {formatCurrency(job.salaryMin)} -{" "}
+                    {formatCurrency(job.salaryMax)}
                   </div>
                 </div>
               </div>
@@ -249,7 +298,7 @@ export function JobDetailPage() {
                 </div>
 
                 <button
-                  onClick={() => setIsApplyModalOpen(true)}
+                  onClick={handleOpenApplyModal}
                   disabled={isApplied || isSubmittingApplication}
                   className={`md:hidden px-8 py-3 rounded-xl font-medium transition-colors ${
                     isApplied
@@ -351,7 +400,7 @@ export function JobDetailPage() {
                         "A leading company in Sri Lanka."}
                     </p>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <div className="text-sm text-gray-500 mb-1">
                           Industry
@@ -385,7 +434,9 @@ export function JobDetailPage() {
                             {job.company.website}
                           </a>
                         ) : (
-                          <span className="font-medium text-gray-900">N/A</span>
+                          <span className="font-medium text-gray-900">
+                            N/A
+                          </span>
                         )}
                       </div>
                     </div>
@@ -435,16 +486,30 @@ export function JobDetailPage() {
 
           <div className="w-full lg:w-[380px] shrink-0">
             <div className="sticky top-24">
-              {isMatchLoading || !matchResult ? (
+              {isMatchLoading ? (
                 <div className="bg-[#F3F4F6] border border-gray-200 rounded-[20px] p-6 animate-pulse h-96" />
+              ) : !matchResult ? (
+                <div className="bg-[#F3F4F6] border border-gray-200 rounded-[20px] p-6">
+                  <h3 className="font-bold text-gray-900 mb-2">
+                    CareerFit Match
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Login as a candidate to view your match score and apply
+                    readiness.
+                  </p>
+                  <button
+                    onClick={() => navigate("/login")}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-xl"
+                  >
+                    Login to View Match
+                  </button>
+                </div>
               ) : (
                 <CareerFitAdvisor
                   matchResult={matchResult}
-                  onViewDetails={() =>
-                    toast.info("Match details modal would open here")
-                  }
+                  onViewDetails={() => setIsAnalysisModalOpen(true)}
                   onImproveCV={() => navigate("/candidate/cv")}
-                  onApply={() => setIsApplyModalOpen(true)}
+                  onApply={handleOpenApplyModal}
                   isApplied={isApplied}
                 />
               )}
@@ -460,6 +525,12 @@ export function JobDetailPage() {
         onSubmit={handleApplySubmit}
         matchScore={displayMatchScore}
         isSubmitting={isSubmittingApplication}
+      />
+
+      <MatchAnalysisModal
+        isOpen={isAnalysisModalOpen}
+        onClose={() => setIsAnalysisModalOpen(false)}
+        matchResult={matchResult}
       />
     </div>
   );

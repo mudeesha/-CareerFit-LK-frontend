@@ -3,6 +3,9 @@ export const API_BASE_URL =
 
 export const API_FILE_BASE_URL = API_BASE_URL.replace("/api", "");
 
+export const AUTH_TOKEN_STORAGE_KEY = "careerfit_token";
+export const AUTH_USER_STORAGE_KEY = "careerfit_user";
+
 export interface ApiSuccessResponse<T> {
   success: true;
   data: T;
@@ -19,6 +22,25 @@ export interface ApiErrorResponse {
 }
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+export function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+export function setAuthToken(token: string) {
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+}
+
+export function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 function buildUrl(
   path: string,
@@ -56,7 +78,10 @@ export async function apiGet<T>(
   path: string,
   params?: Record<string, string | number | undefined>
 ): Promise<T> {
-  const response = await fetch(buildUrl(path, params));
+  const response = await fetch(buildUrl(path, params), {
+    headers: getAuthHeaders(),
+  });
+
   return parseResponse<T>(response);
 }
 
@@ -65,6 +90,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(body),
   });
@@ -77,8 +103,18 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: body ? JSON.stringify(body) : undefined,
+  });
+
+  return parseResponse<T>(response);
+}
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
   });
 
   return parseResponse<T>(response);
@@ -90,6 +126,7 @@ export async function apiUpload<T>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
+    headers: getAuthHeaders(),
     body: formData,
   });
 

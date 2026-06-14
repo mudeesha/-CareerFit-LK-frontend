@@ -98,9 +98,10 @@ export interface Application {
   candidateId: string;
   candidate?: Candidate;
   status: ApplicationStatus;
-  appliedDate: string;
+  appliedAt: string;
+  updatedAt?: string;
+  withdrawnAt?: string | null;
   matchScore: number;
-  lastUpdated: string;
 }
 
 export interface MatchBreakdown {

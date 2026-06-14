@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from "./apiClient";
+import { apiGet, apiPatch, apiUpload } from "./apiClient";
 
 export interface CandidateProfileResponse {
   id: string;
@@ -26,6 +26,11 @@ export interface CandidateProfileResponse {
   };
 }
 
+export interface ProfileEnvelope {
+  profileType: "CANDIDATE" | "EMPLOYER" | "ADMIN";
+  profile: CandidateProfileResponse | null;
+}
+
 export interface UpdateProfilePayload {
   fullName?: string;
   phone?: string;
@@ -43,10 +48,31 @@ export interface UpdateProfilePayload {
   profileImageUrl?: string;
 }
 
+function unwrapCandidateProfile(data: ProfileEnvelope) {
+  if (data.profileType !== "CANDIDATE" || !data.profile) {
+    throw new Error("Candidate profile not found");
+  }
+
+  return data.profile;
+}
+
 export async function getMyProfile() {
-  return apiGet<CandidateProfileResponse>("/profile/me");
+  const data = await apiGet<ProfileEnvelope>("/profile/me");
+
+  return unwrapCandidateProfile(data);
 }
 
 export async function updateMyProfile(payload: UpdateProfilePayload) {
-  return apiPatch<CandidateProfileResponse>("/profile/me", payload);
+  const data = await apiPatch<ProfileEnvelope>("/profile/me", payload);
+
+  return unwrapCandidateProfile(data);
+}
+
+export async function uploadProfileAvatar(file: File) {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const data = await apiUpload<ProfileEnvelope>("/profile/me/avatar", formData);
+
+  return unwrapCandidateProfile(data);
 }
