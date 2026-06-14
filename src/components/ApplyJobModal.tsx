@@ -10,6 +10,25 @@ interface ApplyJobModalProps {
   onSubmit: (coverLetter: string) => Promise<void> | void;
   matchScore: number;
   isSubmitting?: boolean;
+  candidateName?: string;
+  cvFileName?: string;
+  cvUploadedAt?: string;
+}
+
+function formatDate(value?: string) {
+  if (!value) return "N/A";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-LK", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function ApplyJobModal({
@@ -19,14 +38,24 @@ export function ApplyJobModal({
   onSubmit,
   matchScore,
   isSubmitting = false,
+  candidateName = "Candidate",
+  cvFileName = "No CV uploaded",
+  cvUploadedAt,
 }: ApplyJobModalProps) {
   const [coverLetter, setCoverLetter] = useState("");
   const [error, setError] = useState("");
 
   if (!isOpen) return null;
 
+  const hasCv = cvFileName !== "No CV uploaded";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!hasCv) {
+      setError("Please upload a CV before applying.");
+      return;
+    }
 
     if (!coverLetter.trim()) {
       setError("Cover letter is required.");
@@ -76,7 +105,7 @@ export function ApplyJobModal({
               <div className="text-sm text-purple-900 font-medium">
                 Applying as
               </div>
-              <div className="text-purple-700">Nimal Perera</div>
+              <div className="text-purple-700">{candidateName}</div>
             </div>
 
             <div className="text-right">
@@ -104,10 +133,10 @@ export function ApplyJobModal({
 
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">
-                    nimal-perera-cv.pdf
+                    {cvFileName}
                   </div>
                   <div className="text-xs text-gray-500">
-                    Updated 2 days ago
+                    {hasCv ? `Uploaded ${formatDate(cvUploadedAt)}` : "Upload a CV first"}
                   </div>
                 </div>
 
@@ -115,8 +144,11 @@ export function ApplyJobModal({
                   type="button"
                   className="text-sm text-purple-600 font-medium"
                   disabled={isSubmitting}
+                  onClick={() => {
+                    window.location.href = "/candidate/cv";
+                  }}
                 >
-                  Change
+                  {hasCv ? "Change" : "Upload"}
                 </button>
               </div>
             </div>

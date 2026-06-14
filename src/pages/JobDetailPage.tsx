@@ -19,6 +19,8 @@ import { getJobMatch } from "../services/matchApi";
 import { createApplication } from "../services/applicationApi";
 import { getStoredAuthUser } from "../services/authApi";
 import { MatchAnalysisModal } from "../components/MatchAnalysisModal";
+import { getMyProfile, type CandidateProfileResponse } from "../services/profileApi";
+import { getLatestCvAnalysis, type CvAnalysis } from "../services/cvApi";
 
 function workModeLabel(value: Job["workMode"]) {
   const labels: Record<Job["workMode"], string> = {
@@ -48,6 +50,8 @@ export function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
+  const [candidateProfile, setCandidateProfile] = useState<CandidateProfileResponse | null>(null);
+  const [latestCvAnalysis, setLatestCvAnalysis] = useState<CvAnalysis | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isMatchLoading, setIsMatchLoading] = useState(false);
@@ -98,11 +102,17 @@ export function JobDetailPage() {
           try {
             setIsMatchLoading(true);
 
-            const matchData = await getJobMatch(jobId);
+            const [matchData, profileData, cvData] = await Promise.all([
+              getJobMatch(jobId),
+              getMyProfile().catch(() => null),
+              getLatestCvAnalysis().catch(() => null),
+            ]);
 
             if (!isMounted) return;
 
             setMatchResult(matchData);
+            setCandidateProfile(profileData);
+            setLatestCvAnalysis(cvData);
           } catch {
             setMatchResult(null);
           } finally {
@@ -525,6 +535,9 @@ export function JobDetailPage() {
         onSubmit={handleApplySubmit}
         matchScore={displayMatchScore}
         isSubmitting={isSubmittingApplication}
+        candidateName={candidateProfile?.fullName}
+        cvFileName={latestCvAnalysis?.fileName}
+        cvUploadedAt={latestCvAnalysis?.createdAt}
       />
 
       <MatchAnalysisModal
