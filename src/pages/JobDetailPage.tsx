@@ -20,7 +20,7 @@ import { createApplication } from "../services/applicationApi";
 import { getStoredAuthUser } from "../services/authApi";
 import { MatchAnalysisModal } from "../components/MatchAnalysisModal";
 import { getMyProfile, type CandidateProfileResponse } from "../services/profileApi";
-import { getLatestCvAnalysis, type CvAnalysis } from "../services/cvApi";
+import { getDefaultCvAnalysis, type CvAnalysis } from "../services/cvApi";
 
 function workModeLabel(value: Job["workMode"]) {
   const labels: Record<Job["workMode"], string> = {
@@ -105,7 +105,7 @@ export function JobDetailPage() {
             const [matchData, profileData, cvData] = await Promise.all([
               getJobMatch(jobId),
               getMyProfile().catch(() => null),
-              getLatestCvAnalysis().catch(() => null),
+              getDefaultCvAnalysis().catch(() => null),
             ]);
 
             if (!isMounted) return;

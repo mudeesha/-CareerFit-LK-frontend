@@ -1,9 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
-import { UploadCloud, FileText, CheckCircle2 } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  FileText,
+  Star,
+  UploadCloud,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   CV_FILE_BASE_URL,
-  getLatestCvAnalysis,
+  getDefaultCvAnalysis,
+  getMyCvAnalyses,
+  setDefaultCvAnalysis,
   uploadCv,
   type CvAnalysis,
 } from "../../services/cvApi";
@@ -12,37 +19,175 @@ function toSafeArray(value?: string[] | null) {
   return Array.isArray(value) ? value : [];
 }
 
-function scoreLabel(score: number) {
-  if (score >= 80) return "Excellent";
-  if (score >= 60) return "Good";
-  if (score >= 40) return "Average";
-  return "Needs Work";
+function formatDate(value?: string) {
+  if (!value) return "N/A";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-LK", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function CvListCard({
+  cv,
+  isSettingDefault,
+  onSetDefault,
+}: {
+  cv: CvAnalysis;
+  isSettingDefault: boolean;
+  onSetDefault: (cvId: string) => void;
+}) {
+  const skills = toSafeArray(cv.extractedSkills);
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-center gap-2">
+            <FileText className="h-5 w-5 shrink-0 text-purple-600" />
+
+            <h3 className="truncate font-bold text-gray-900">{cv.fileName}</h3>
+
+            {cv.isDefault && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700">
+                <Star className="h-3 w-3" />
+                Default
+              </span>
+            )}
+          </div>
+
+          <p className="mb-3 text-sm text-gray-500">
+            Uploaded {formatDate(cv.createdAt)}
+          </p>
+
+          <div className="mb-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+            <div className="rounded-xl bg-[#F3F4F6] p-3">
+              <div className="text-xs text-gray-500">Experience</div>
+              <div className="font-semibold text-gray-900">
+                {cv.experienceYears ?? 0} years
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-[#F3F4F6] p-3">
+              <div className="text-xs text-gray-500">Education</div>
+              <div className="truncate font-semibold text-gray-900">
+                {toSafeArray(cv.education).join(", ") || "Not detected"}
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-[#F3F4F6] p-3">
+              <div className="text-xs text-gray-500">Languages</div>
+              <div className="truncate font-semibold text-gray-900">
+                {toSafeArray(cv.languages).join(", ") || "Not detected"}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 text-sm font-semibold text-gray-900">
+              Extracted Skills
+            </div>
+
+            {skills.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {skills.slice(0, 12).map((skill) => (
+                  <span
+                    key={skill}
+                    className="rounded-lg border border-gray-200 bg-[#F3F4F6] px-3 py-1.5 text-sm font-medium text-gray-700"
+                  >
+                    {skill}
+                  </span>
+                ))}
+
+                {skills.length > 12 && (
+                  <span className="rounded-lg border border-gray-200 bg-[#F3F4F6] px-3 py-1.5 text-sm font-medium text-gray-500">
+                    +{skills.length - 12} more
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                No extracted skills found.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+          {cv.fileUrl && (
+            <a
+              href={`${CV_FILE_BASE_URL}${cv.fileUrl}`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              View CV
+            </a>
+          )}
+
+          {!cv.isDefault && (
+            <button
+              type="button"
+              onClick={() => onSetDefault(cv.id)}
+              disabled={isSettingDefault}
+              className="rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-60"
+            >
+              {isSettingDefault ? "Updating..." : "Set as Default"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function CandidateCV() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [analysis, setAnalysis] = useState<CvAnalysis | null>(null);
-  const [activeTab, setActiveTab] = useState("skills");
+  const [cvs, setCvs] = useState<CvAnalysis[]>([]);
+  const [defaultCv, setDefaultCv] = useState<CvAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
-  const isUploaded = Boolean(analysis);
+  const hasCvs = cvs.length > 0;
+
+  const sortedCvs = useMemo(() => {
+    return [...cvs].sort((a, b) => {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [cvs]);
+
+  async function loadCvData() {
+    try {
+      setIsLoading(true);
+
+      const [allCvs, defaultAnalysis] = await Promise.all([
+        getMyCvAnalyses(),
+        getDefaultCvAnalysis().catch(() => null),
+      ]);
+
+      setCvs(allCvs.items);
+      setDefaultCv(defaultAnalysis);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load CVs");
+      setCvs([]);
+      setDefaultCv(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadLatestAnalysis() {
-      try {
-        setIsLoading(true);
-        const data = await getLatestCvAnalysis();
-        setAnalysis(data);
-      } catch {
-        setAnalysis(null);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadLatestAnalysis();
+    loadCvData();
   }, []);
 
   const handleBrowseClick = () => {
@@ -73,11 +218,20 @@ export function CandidateCV() {
 
     try {
       setIsUploading(true);
-      const uploadedAnalysis = await uploadCv(file);
 
-      setAnalysis(uploadedAnalysis);
-      setActiveTab("skills");
-      toast.success("CV uploaded and analyzed successfully!");
+      const uploadedCv = await uploadCv(file);
+
+      setCvs((currentCvs) => [
+        uploadedCv,
+        ...currentCvs.map((cv) => ({
+          ...cv,
+          isDefault: false,
+        })),
+      ]);
+
+      setDefaultCv(uploadedCv);
+
+      toast.success("CV uploaded successfully. It is now your default CV.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "CV upload failed");
     } finally {
@@ -86,15 +240,33 @@ export function CandidateCV() {
     }
   };
 
-  const extractedSkills = toSafeArray(analysis?.extractedSkills);
-  const missingSkills = toSafeArray(analysis?.missingSkills);
-  const suggestions = toSafeArray(analysis?.suggestions);
-  const education = toSafeArray(analysis?.education);
-  const languages = toSafeArray(analysis?.languages);
-  const strengthScore = analysis?.strengthScore || 0;
+  const handleSetDefault = async (cvId: string) => {
+    try {
+      setSettingDefaultId(cvId);
+
+      const updatedCv = await setDefaultCvAnalysis(cvId);
+
+      setCvs((currentCvs) =>
+        currentCvs.map((cv) => ({
+          ...cv,
+          isDefault: cv.id === updatedCv.id,
+        }))
+      );
+
+      setDefaultCv(updatedCv);
+
+      toast.success("Default CV updated");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update default CV"
+      );
+    } finally {
+      setSettingDefaultId(null);
+    }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto pb-10">
+    <div className="mx-auto max-w-6xl pb-10">
       <input
         ref={fileInputRef}
         type="file"
@@ -103,275 +275,151 @@ export function CandidateCV() {
         onChange={handleFileChange}
       />
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">CV Analysis</h1>
-        <p className="text-gray-600">
-          Upload your CV and get AI-powered career insights.
-        </p>
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="mb-1 text-2xl font-bold text-gray-900">My CVs</h1>
+          <p className="text-gray-600">
+            Upload multiple CVs and choose the default CV used for job matching.
+          </p>
+        </div>
+
+        <button
+          onClick={handleBrowseClick}
+          disabled={isUploading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-60"
+        >
+          <UploadCloud className="h-5 w-5" />
+          {isUploading ? "Uploading..." : "Upload CV"}
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-[#F3F4F6] border border-gray-200 rounded-[20px] p-8 text-center">
-            {isLoading ? (
-              <div className="bg-white border border-gray-200 rounded-2xl p-12 flex flex-col items-center justify-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full mb-4 animate-pulse" />
-                <div className="h-5 w-48 bg-gray-100 rounded mb-3 animate-pulse" />
-                <div className="h-4 w-32 bg-gray-100 rounded animate-pulse" />
-              </div>
-            ) : !isUploaded ? (
-              <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-12 flex flex-col items-center justify-center">
-                <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mb-4">
-                  <UploadCloud className="w-8 h-8 text-purple-600" />
-                </div>
-
-                <h3 className="text-lg font-bold text-gray-900 mb-2">
-                  Upload your CV
-                </h3>
-
-                <p className="text-sm text-gray-500 mb-6">
-                  PDF or DOCX up to 5MB
-                </p>
-
-                <button
-                  onClick={handleBrowseClick}
-                  disabled={isUploading}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors disabled:opacity-60"
-                >
-                  {isUploading ? "Uploading..." : "Browse Files"}
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center">
-                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-4">
-                  <FileText className="w-8 h-8 text-green-600" />
-                </div>
-
-                <h3 className="text-lg font-bold text-gray-900 mb-2">
-                  {analysis?.fileName}
-                </h3>
-
-                <p className="text-sm text-green-600 font-medium mb-6 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" /> Uploaded successfully
-                </p>
-
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {analysis?.fileUrl && (
-                    <a
-                      href={`${CV_FILE_BASE_URL}${analysis.fileUrl}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-white border border-gray-200 text-gray-700 font-medium px-6 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      View CV
-                    </a>
-                  )}
-
-                  <button
-                    onClick={handleBrowseClick}
-                    disabled={isUploading}
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors disabled:opacity-60"
-                  >
-                    {isUploading ? "Uploading..." : "Upload New CV"}
-                  </button>
-                </div>
-              </div>
-            )}
+      {isLoading ? (
+        <div className="rounded-[20px] border border-gray-200 bg-[#F3F4F6] p-8">
+          <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-gray-500">
+            Loading CVs...
+          </div>
+        </div>
+      ) : !hasCvs ? (
+        <div className="rounded-[20px] border border-gray-200 bg-[#F3F4F6] p-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-purple-50">
+            <UploadCloud className="h-8 w-8 text-purple-600" />
           </div>
 
-          {isUploaded && (
-            <div>
-              <div className="flex items-center gap-6 border-b border-gray-200 mb-6">
-                {["Skills", "Experience", "Suggestions"].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab.toLowerCase())}
-                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab.toLowerCase()
-                        ? "border-purple-600 text-purple-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {tab}
-                  </button>
+          <h3 className="mb-2 text-lg font-bold text-gray-900">
+            Upload your first CV
+          </h3>
+
+          <p className="mb-6 text-sm text-gray-500">
+            PDF or DOCX up to 5MB. Your first uploaded CV will be selected as
+            default automatically.
+          </p>
+
+          <button
+            onClick={handleBrowseClick}
+            disabled={isUploading}
+            className="rounded-xl bg-purple-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-60"
+          >
+            {isUploading ? "Uploading..." : "Browse Files"}
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_340px]">
+          <div className="space-y-4">
+            <div className="rounded-[20px] border border-gray-200 bg-[#F3F4F6] p-5">
+              <h2 className="mb-4 text-lg font-bold text-gray-900">
+                Uploaded CVs
+              </h2>
+
+              <div className="space-y-4">
+                {sortedCvs.map((cv) => (
+                  <CvListCard
+                    key={cv.id}
+                    cv={cv}
+                    isSettingDefault={settingDefaultId === cv.id}
+                    onSetDefault={handleSetDefault}
+                  />
                 ))}
               </div>
-
-              <div className="bg-[#F3F4F6] border border-gray-200 rounded-[20px] p-6">
-                {activeTab === "skills" && (
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="font-bold text-gray-900 mb-3">
-                        Extracted Skills
-                      </h4>
-
-                      <div className="flex flex-wrap gap-2">
-                        {extractedSkills.length > 0 ? (
-                          extractedSkills.map((skill) => (
-                            <span
-                              key={skill}
-                              className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium"
-                            >
-                              {skill}
-                            </span>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500">
-                            No extracted skills found.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-bold text-gray-900 mb-3">
-                        Missing High-Demand Skills
-                      </h4>
-
-                      <div className="flex flex-wrap gap-2">
-                        {missingSkills.length > 0 ? (
-                          missingSkills.map((skill) => (
-                            <span
-                              key={skill}
-                              className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-1.5 rounded-lg text-sm font-medium"
-                            >
-                              {skill}
-                            </span>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500">
-                            No missing skills detected.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === "experience" && (
-                  <div className="space-y-4">
-                    <div className="bg-white p-4 rounded-xl border border-gray-200">
-                      <div className="font-bold text-gray-900">
-                        Detected Experience
-                      </div>
-                      <div className="text-sm text-gray-500 mb-2">
-                        {analysis?.experienceYears || 0} years
-                      </div>
-                      <p className="text-sm text-gray-700">
-                        This is the experience value detected during analysis.
-                      </p>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-xl border border-gray-200">
-                      <div className="font-bold text-gray-900">Education</div>
-                      <div className="text-sm text-gray-700">
-                        {education.length > 0
-                          ? education.join(", ")
-                          : "Not detected"}
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-xl border border-gray-200">
-                      <div className="font-bold text-gray-900">Languages</div>
-                      <div className="text-sm text-gray-700">
-                        {languages.length > 0
-                          ? languages.join(", ")
-                          : "Not detected"}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === "suggestions" && (
-                  <div className="space-y-4">
-                    {suggestions.length > 0 ? (
-                      suggestions.map((suggestion) => (
-                        <div
-                          key={suggestion}
-                          className="bg-white p-5 rounded-xl border border-gray-200"
-                        >
-                          <h4 className="font-bold text-gray-900 mb-2">
-                            {suggestion}
-                          </h4>
-
-                          <p className="text-sm text-gray-600">
-                            Improve this area to increase your CV strength and
-                            job match score.
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="bg-white p-5 rounded-xl border border-gray-200 text-sm text-gray-500">
-                        No suggestions available.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
-          )}
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-[#F3F4F6] border border-gray-200 rounded-[20px] p-6 text-center">
-            <h3 className="font-bold text-gray-900 mb-6">CV Strength Score</h3>
-
-            <div className="relative w-32 h-32 mx-auto mb-4">
-              <svg
-                className="w-full h-full transform -rotate-90"
-                viewBox="0 0 36 36"
-              >
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#E5E7EB"
-                  strokeWidth="3"
-                />
-
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke={isUploaded ? "#16A34A" : "#9CA3AF"}
-                  strokeWidth="3"
-                  strokeDasharray={
-                    isUploaded ? `${strengthScore}, 100` : "0, 100"
-                  }
-                />
-              </svg>
-
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-3xl font-bold text-gray-900">
-                  {isUploaded ? `${strengthScore}%` : "--"}
-                </span>
-              </div>
-            </div>
-
-            {isUploaded && (
-              <div className="inline-flex px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-bold mb-4">
-                {scoreLabel(strengthScore)}
-              </div>
-            )}
-
-            <p className="text-sm text-gray-500">
-              {isUploaded
-                ? "Your CV has been analyzed using the latest uploaded file."
-                : "Upload your CV to see your score."}
-            </p>
           </div>
 
-          {isUploaded && analysis?.fileUrl && (
-            <a
-              href={`${CV_FILE_BASE_URL}${analysis.fileUrl}`}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              View Uploaded CV
-            </a>
-          )}
+          <div className="space-y-6">
+            <div className="rounded-[20px] border border-gray-200 bg-[#F3F4F6] p-6">
+              <h3 className="mb-4 font-bold text-gray-900">Default CV</h3>
+
+              {defaultCv ? (
+                <div className="rounded-2xl border border-purple-100 bg-white p-5">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-purple-50">
+                    <CheckCircle2 className="h-6 w-6 text-purple-600" />
+                  </div>
+
+                  <h4 className="mb-2 break-words font-bold text-gray-900">
+                    {defaultCv.fileName}
+                  </h4>
+
+                  <p className="mb-4 text-sm text-gray-500">
+                    Uploaded {formatDate(defaultCv.createdAt)}
+                  </p>
+
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <div className="text-gray-500">Experience</div>
+                      <div className="font-semibold text-gray-900">
+                        {defaultCv.experienceYears ?? 0} years
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-500">Education</div>
+                      <div className="font-semibold text-gray-900">
+                        {toSafeArray(defaultCv.education).join(", ") ||
+                          "Not detected"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-500">Languages</div>
+                      <div className="font-semibold text-gray-900">
+                        {toSafeArray(defaultCv.languages).join(", ") ||
+                          "Not detected"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {defaultCv.fileUrl && (
+                    <a
+                      href={`${CV_FILE_BASE_URL}${defaultCv.fileUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-3 font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      <FileText className="h-4 w-4" />
+                      View Default CV
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl bg-white p-5 text-sm text-gray-500">
+                  No default CV selected.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-[20px] border border-gray-200 bg-[#F3F4F6] p-6">
+              <h3 className="mb-3 font-bold text-gray-900">
+                How default CV works
+              </h3>
+
+              <p className="text-sm leading-6 text-gray-600">
+                Your default CV is used to calculate job match scores across job
+                listings and job details. When you apply for a job, that
+                application stores the selected CV reference so employers can see
+                the exact CV used for that application.
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
