@@ -3,6 +3,7 @@ import type { Application } from "../lib/types";
 
 export interface CreateApplicationPayload {
   jobId: string;
+  cvAnalysisId: string;
   coverLetter: string;
 }
 
@@ -11,16 +12,24 @@ export interface UpdateApplicationPayload {
   coverLetter: string;
 }
 
-export interface PreviewApplicationPayload {
+export interface PreviewJobApplicationPayload {
+  jobId: string;
   cvAnalysisId: string;
 }
 
 export interface ApplicationPreview {
-  applicationId: string;
+  applicationId?: string;
   jobId: string;
   cvAnalysisId: string;
   fileName: string;
   matchScore: number;
+  breakdown: {
+    skills: number;
+    experience: number;
+    location: number;
+    salary: number;
+    language: number;
+  };
   matchedSkills: string[];
   missingSkills: string[];
   suggestions: string[];
@@ -45,14 +54,10 @@ export async function updateApplication(
   return apiPatch<Application>(`/applications/${applicationId}`, payload);
 }
 
-export async function previewApplication(
-  applicationId: string,
-  payload: PreviewApplicationPayload
+export async function previewJobApplication(
+  payload: PreviewJobApplicationPayload
 ) {
-  return apiPost<ApplicationPreview>(
-    `/applications/${applicationId}/preview`,
-    payload
-  );
+  return apiPost<ApplicationPreview>("/applications/preview", payload);
 }
 
 export async function withdrawApplication(applicationId: string) {

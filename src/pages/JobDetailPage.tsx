@@ -10,13 +10,15 @@ import {
 import { toast } from "sonner";
 import { CompanyLogo } from "../components/CompanyLogo";
 import { CareerFitAdvisor } from "../components/CareerFitAdvisor";
-import { ApplyJobModal } from "../components/ApplyJobModal";
+import { ApplicationFormModal } from "../components/ApplicationFormModal";
 import { formatCurrency } from "../lib/utils";
 import { JobCard } from "../components/JobCard";
 import type { Job, MatchResult } from "../lib/types";
 import { getJobById, getJobs } from "../services/jobApi";
 import { getJobMatch } from "../services/matchApi";
-import { createApplication } from "../services/applicationApi";
+import {
+  createApplication,
+} from "../services/applicationApi";
 import { getStoredAuthUser } from "../services/authApi";
 import { MatchAnalysisModal } from "../components/MatchAnalysisModal";
 import { getMyProfile, type CandidateProfileResponse } from "../services/profileApi";
@@ -161,7 +163,12 @@ export function JobDetailPage() {
     setIsApplyModalOpen(true);
   };
 
-  const handleApplySubmit = async (coverLetter: string) => {
+  const handleApplySubmit = async (
+    payload: {
+      cvAnalysisId: string;
+      coverLetter: string;
+    }
+  ) => {
     if (!job) return;
 
     try {
@@ -169,11 +176,13 @@ export function JobDetailPage() {
 
       await createApplication({
         jobId: job.id,
-        coverLetter,
+        cvAnalysisId: payload.cvAnalysisId,
+        coverLetter: payload.coverLetter,
       });
 
       setIsApplyModalOpen(false);
       setIsApplied(true);
+
       toast.success("Application submitted successfully!");
     } catch (err) {
       toast.error(
@@ -528,16 +537,15 @@ export function JobDetailPage() {
         </div>
       </div>
 
-      <ApplyJobModal
+      <ApplicationFormModal
+        mode="apply"
         job={job}
         isOpen={isApplyModalOpen}
         onClose={() => setIsApplyModalOpen(false)}
         onSubmit={handleApplySubmit}
-        matchScore={displayMatchScore}
+        initialCvAnalysisId={latestCvAnalysis?.id}
+        initialCoverLetter=""
         isSubmitting={isSubmittingApplication}
-        candidateName={candidateProfile?.fullName}
-        cvFileName={latestCvAnalysis?.fileName}
-        cvUploadedAt={latestCvAnalysis?.createdAt}
       />
 
       <MatchAnalysisModal
