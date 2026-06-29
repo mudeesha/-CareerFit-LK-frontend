@@ -42,6 +42,7 @@ import { EmployerNewJob } from "./pages/employer/EmployerNewJob";
 import { EmployerApplicants } from "./pages/employer/EmployerApplicants";
 import { EmployerCompany } from "./pages/employer/EmployerCompany";
 import { EmployerSettings } from "./pages/employer/EmployerSettings";
+import { EmployerEditJob } from "./pages/employer/EmployerEditJob";
 
 // Admin Pages
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
@@ -258,6 +259,7 @@ export function App() {
             <Route path="dashboard" element={<EmployerDashboard />} />
             <Route path="jobs" element={<EmployerJobs />} />
             <Route path="jobs/new" element={<EmployerNewJob />} />
+            <Route path="jobs/:id/edit" element={<EmployerEditJob />} />
             <Route
               path="jobs/:jobId/applicants"
               element={<EmployerApplicants />}
