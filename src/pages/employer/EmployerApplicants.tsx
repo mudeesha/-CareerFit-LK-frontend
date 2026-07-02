@@ -10,7 +10,12 @@ import {
   markApplicationViewed,
   rejectApplication,
   shortlistApplication,
+  hireApplication,
 } from "../../services/employer/ApplicantApi";
+import {
+  scheduleInterview,
+  type ScheduleInterviewPayload,
+} from "../../services/employer/InterviewApi";
 import {
   ApplicantCard,
   type EmployerApplicantView,
@@ -23,13 +28,16 @@ import {
   MatchDetailsModal,
   type MatchDetailsModalData,
 } from "../../components/MatchDetailsModal";
+import { ScheduleInterviewModal } from "../../components/ScheduleInterviewModal";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
-type ModalState = "none" | "cv" | "match";
+type ModalState = "none" | "cv" | "match" | "schedule";
 
 type EmployerApplication = Application & {
   candidate?: any;
   cvAnalysis?: any;
   job?: Job;
+  interview?: any;
   coverLetter?: string | null;
   appliedAt?: string | null;
   matchScore?: number | null;
@@ -144,6 +152,9 @@ export function EmployerApplicants() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const [hireTargetApplication, setHireTargetApplication] =
+  useState<EmployerApplication | null>(null);
 
   async function loadApplicants() {
     if (!jobId) return;
@@ -263,6 +274,52 @@ export function EmployerApplicants() {
     }
   };
 
+  const handleScheduleInterview = async (payload: ScheduleInterviewPayload) => {
+    if (!selectedApplication) return;
+
+    try {
+      setActionLoadingId(selectedApplication.id);
+
+      const response: any = await scheduleInterview(
+        selectedApplication.id,
+        payload
+      );
+
+      const updatedApplication = response.application || response;
+
+      updateApplicationInList(updatedApplication);
+      setSelectedApplication(updatedApplication as EmployerApplication);
+      setModalState("none");
+
+      toast.success("Interview scheduled successfully.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to schedule interview"
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleConfirmHire = async () => {
+    if (!hireTargetApplication) return;
+
+    try {
+      setActionLoadingId(hireTargetApplication.id);
+
+      const updatedApplication = await hireApplication(hireTargetApplication.id);
+
+      updateApplicationInList(updatedApplication);
+      setHireTargetApplication(null);
+
+      toast.success("Candidate hired successfully.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to hire candidate");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto pb-10">
       <div className="mb-8">
@@ -339,9 +396,11 @@ export function EmployerApplicants() {
                   }}
                   onShortlist={() => handleShortlist(application.id)}
                   onReject={() => handleReject(application.id)}
-                  onScheduleInterview={() =>
-                    toast.info("Interview scheduling will be connected next.")
-                  }
+                  onScheduleInterview={() => {
+                    setSelectedApplication(application);
+                    setModalState("schedule");
+                  }}
+                  onHire={() => setHireTargetApplication(application)}
                 />
               );
             })
@@ -366,6 +425,38 @@ export function EmployerApplicants() {
           onClose={() => setModalState("none")}
         />
       )}
+
+      {selectedApplication && (
+        <ScheduleInterviewModal
+          candidateName={getCandidateName(selectedApplication)}
+          jobTitle={job?.title || "Job"}
+          isOpen={modalState === "schedule"}
+          isSubmitting={actionLoadingId === selectedApplication.id}
+          initialValues={
+            selectedApplication.interview
+              ? {
+                  interviewDate: selectedApplication.interview.interviewDate,
+                  interviewTime: selectedApplication.interview.interviewTime,
+                  interviewType: selectedApplication.interview.interviewType,
+                  locationOrLink: selectedApplication.interview.locationOrLink,
+                  notes: selectedApplication.interview.notes,
+                }
+              : undefined
+          }
+          onClose={() => setModalState("none")}
+          onSubmit={handleScheduleInterview}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={!!hireTargetApplication}
+        title="Hire Candidate?"
+        description={`Are you sure you want to hire ${hireTargetApplication ? getCandidateName(hireTargetApplication) : "this candidate"}? This will mark the application as hired.`}
+        confirmLabel="Hire Candidate"
+        isLoading={actionLoadingId === hireTargetApplication?.id}
+        onClose={() => setHireTargetApplication(null)}
+        onConfirm={handleConfirmHire}
+      />
     </div>
   );
 }

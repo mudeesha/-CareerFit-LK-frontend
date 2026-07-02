@@ -1,35 +1,85 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import type {
+  InterviewType,
+  ScheduleInterviewPayload,
+} from "../services/employer/InterviewApi";
+
+type InterviewTypeOption = {
+  label: string;
+  value: InterviewType;
+};
+
+const INTERVIEW_TYPE_OPTIONS: InterviewTypeOption[] = [
+  { label: "Online", value: "ONLINE" },
+  { label: "On-site", value: "ONSITE" },
+  { label: "Phone", value: "PHONE" },
+];
+
 interface ScheduleInterviewModalProps {
   candidateName: string;
   jobTitle: string;
   isOpen: boolean;
+  isSubmitting?: boolean;
+  initialValues?: Partial<ScheduleInterviewPayload>;
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: (payload: ScheduleInterviewPayload) => void;
 }
+
 export function ScheduleInterviewModal({
   candidateName,
   jobTitle,
   isOpen,
+  isSubmitting = false,
+  initialValues,
   onClose,
-  onSubmit
+  onSubmit,
 }: ScheduleInterviewModalProps) {
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [type, setType] = useState('Online');
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [type, setType] = useState<InterviewType>("ONLINE");
+  const [locationOrLink, setLocationOrLink] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setDate(initialValues?.interviewDate || "");
+    setTime(initialValues?.interviewTime || "");
+    setType(initialValues?.interviewType || "ONLINE");
+    setLocationOrLink(initialValues?.locationOrLink || "");
+    setNotes(initialValues?.notes || "");
+  }, [isOpen, initialValues]);
+
   if (!isOpen) return null;
+
+  const selectedTypeLabel =
+    INTERVIEW_TYPE_OPTIONS.find((option) => option.value === type)?.label ||
+    "Online";
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (date && time) {
-      onSubmit();
-    }
+
+    if (!date || !time) return;
+
+    onSubmit({
+      interviewDate: date,
+      interviewTime: time,
+      interviewType: type,
+      locationOrLink: locationOrLink.trim() || undefined,
+      notes: notes.trim() || undefined,
+    });
   };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Close modal"
         className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose} />
-      
+        onClick={onClose}
+      />
+
       <div className="relative w-full max-w-md bg-white rounded-[20px] shadow-xl overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div>
@@ -40,10 +90,13 @@ export function ScheduleInterviewModal({
               {candidateName} • {jobTitle}
             </p>
           </div>
+
           <button
+            type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600">
-            
+            disabled={isSubmitting}
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -52,8 +105,8 @@ export function ScheduleInterviewModal({
           <form
             id="schedule-form"
             onSubmit={handleSubmit}
-            className="space-y-4">
-            
+            className="space-y-4"
+          >
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -64,9 +117,10 @@ export function ScheduleInterviewModal({
                   required
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none" />
-                
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
+                />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Time *
@@ -76,8 +130,8 @@ export function ScheduleInterviewModal({
                   required
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none" />
-                
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
+                />
               </div>
             </div>
 
@@ -87,12 +141,14 @@ export function ScheduleInterviewModal({
               </label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none">
-                
-                <option>Online</option>
-                <option>On-site</option>
-                <option>Phone</option>
+                onChange={(e) => setType(e.target.value as InterviewType)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
+              >
+                {INTERVIEW_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -102,11 +158,17 @@ export function ScheduleInterviewModal({
               </label>
               <input
                 type="text"
+                value={locationOrLink}
+                onChange={(e) => setLocationOrLink(e.target.value)}
                 placeholder={
-                type === 'Online' ? 'e.g. Zoom link' : 'e.g. Office address'
+                  selectedTypeLabel === "Online"
+                    ? "e.g. Zoom link"
+                    : selectedTypeLabel === "Phone"
+                      ? "e.g. Phone number"
+                      : "e.g. Office address"
                 }
-                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none" />
-              
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
+              />
             </div>
 
             <div>
@@ -115,9 +177,11 @@ export function ScheduleInterviewModal({
               </label>
               <textarea
                 rows={3}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 placeholder="Any instructions for the interview..."
-                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none" />
-              
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-600 outline-none"
+              />
             </div>
           </form>
         </div>
@@ -126,19 +190,22 @@ export function ScheduleInterviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-xl transition-colors">
-            
+            disabled={isSubmitting}
+            className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-60"
+          >
             Cancel
           </button>
+
           <button
             type="submit"
             form="schedule-form"
-            className="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors">
-            
-            Schedule
+            disabled={isSubmitting}
+            className="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors disabled:opacity-60"
+          >
+            {isSubmitting ? "Scheduling..." : "Schedule"}
           </button>
         </div>
       </div>
-    </div>);
-
+    </div>
+  );
 }

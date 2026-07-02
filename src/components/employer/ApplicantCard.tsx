@@ -1,4 +1,11 @@
-import { FileText, BrainCircuit, CheckCircle, XCircle, Calendar } from "lucide-react";
+import {
+  FileText,
+  BrainCircuit,
+  CheckCircle,
+  XCircle,
+  Calendar,
+  UserCheck,
+} from "lucide-react";
 import type { ApplicationStatus } from "../../lib/types";
 import { ApplicantStatusBadge } from "./ApplicantStatusBadge";
 import { ApplicantSkillTags } from "./ApplicantSkillTags";
@@ -22,6 +29,7 @@ type ApplicantCardProps = {
   onShortlist: () => void;
   onReject: () => void;
   onScheduleInterview: () => void;
+  onHire: () => void;
 };
 
 export function ApplicantCard({
@@ -31,11 +39,16 @@ export function ApplicantCard({
   onShortlist,
   onReject,
   onScheduleInterview,
+  onHire,
 }: ApplicantCardProps) {
-  const canShortlistOrReject = applicant.status === "APPLIED";
+  const canShortlistOrReject =
+    applicant.status === "APPLIED" || applicant.status === "VIEWED";
+
   const canScheduleInterview =
     applicant.status === "SHORTLISTED" ||
     applicant.status === "INTERVIEW_SCHEDULED";
+
+  const canHire = applicant.status === "INTERVIEW_SCHEDULED";
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-6 flex flex-col lg:flex-row gap-6">
@@ -122,6 +135,16 @@ export function ApplicantCard({
             {applicant.status === "INTERVIEW_SCHEDULED"
               ? "Reschedule"
               : "Schedule Interview"}
+          </button>
+        )}
+
+        {canHire && (
+          <button
+            onClick={onHire}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
+          >
+            <UserCheck className="w-4 h-4" />
+            Hire Candidate
           </button>
         )}
       </div>
